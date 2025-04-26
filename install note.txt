@@ -1,0 +1,2 @@
+pyinstaller --noconsole --onefile component_tester_app.py
+python component_tester_app.py
