@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import sqlite3
 import webbrowser
+import fitz  # <-- اضافه شد برای جستجو در PDF
 
 # Constants
 TOLERANCE = 0.2
@@ -103,6 +104,20 @@ class ComponentTesterApp:
 
         ttk.Button(name_frame, text="Upload PDF", command=self.upload_pdf).pack(side='left', padx=5)
         ttk.Button(name_frame, text="View PDFs", command=self.view_pdf_files).pack(side='left', padx=5)
+
+        # ----- 🔵 اضافه شدن سرچ پیشرفته 🔵 -----
+        advanced_search_frame = ttk.LabelFrame(self.root, text="Advanced Search", padding=10)
+        advanced_search_frame.pack(fill='x', padx=10, pady=5)
+
+        self.adv_search_var = tk.StringVar()
+        adv_entry = ttk.Entry(advanced_search_frame, textvariable=self.adv_search_var)
+        adv_entry.pack(side='left', padx=5)
+        ttk.Button(advanced_search_frame, text="Search DB Names", command=self.advanced_search_db).pack(side='left', padx=5)
+        ttk.Button(advanced_search_frame, text="Search Inside PDFs", command=self.advanced_search_pdf).pack(side='left', padx=5)
+
+        self.adv_listbox = tk.Listbox(advanced_search_frame, height=5)
+        self.adv_listbox.pack(fill='x', pady=5)
+        # -------------------------------------
 
         pin_frame = ttk.Frame(self.root, padding=10)
         pin_frame.pack(fill='x')
@@ -307,6 +322,41 @@ class ComponentTesterApp:
             v.set("")
         self.suggestion_listbox.delete(0, tk.END)
 
+    # 🔵 متدهای جدید برای سرچ پیشرفته 🔵
+    def advanced_search_db(self):
+        query = self.adv_search_var.get().strip()
+        if not query:
+            return
+        conn = self.db.connections[self.db.active_db]
+        c = conn.cursor()
+        c.execute("SELECT DISTINCT name FROM components WHERE name LIKE ?", ('%' + query + '%',))
+        results = [row[0] for row in c.fetchall()]
+        self.show_advanced_results(results)
+
+    def advanced_search_pdf(self):
+        query = self.adv_search_var.get().strip().lower()
+        if not query:
+            return
+        results = []
+        for filename in os.listdir(PDF_FOLDER):
+            if filename.lower().endswith(".pdf"):
+                filepath = os.path.join(PDF_FOLDER, filename)
+                try:
+                    doc = fitz.open(filepath)
+                    for page in doc:
+                        text = page.get_text().lower()
+                        if query in text:
+                            results.append(filename)
+                            break
+                    doc.close()
+                except Exception as e:
+                    print(f"Error reading {filename}: {str(e)}")
+        self.show_advanced_results(results)
+
+    def show_advanced_results(self, results):
+        self.adv_listbox.delete(0, tk.END)
+        for item in results:
+            self.adv_listbox.insert(tk.END, item)
 
 if __name__ == "__main__":
     root = tk.Tk()
